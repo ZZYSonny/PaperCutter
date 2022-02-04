@@ -83,11 +83,16 @@ def work(inFilePath:str, outFile:PdfFileWriter):
         for p in process(i,np.array(images[i]),inFile.getPage(i)):
             outFile.addPage(p)
 
-'''RuleCrop the file and save'''
+'''RuleCrop the file'''
 def workFile(inFilePath:str, outFilePath:str):
     outFile= PdfFileWriter()
     work(inFilePath,outFile)
     with open(outFilePath,'wb') as outStream: outFile.write(outStream) 
+
+'''RuleCrop the file in every folder'''
+def workFolder(inFolderPath:str, outFolderPath:str):
+    for inFileName in os.listdir(inFolderPath):
+        workFile(inFolderPath+"/"+inFileName, outFolderPath+"/"+inFileName)
 
 '''For all pdfs in the folder, in the order of the integer they contain,
 - RuleCrop
@@ -100,14 +105,15 @@ def workFolderAndMerge(inFolderPath:str, outFilePath:str):
         os.listdir(inFolderPath),
         key=lambda s:int(re.sub('\D', '', s))
     )
-    for inFilePath in pdfList:
-        print("Start: "+inFilePath)
+    for fileName in pdfList:
+        print("Start: "+fileName)
         nPageBefore=outFile.getNumPages()
-        work(inFolderPath+"/"+inFilePath,outFile)
-        fileName=inFilePath.split("/")[-1].split(".")[0]
-        outFile.addBookmark(fileName,nPageBefore , parent=None)
+        work(inFolderPath+"/"+fileName,outFile)
+        pdfName=fileName.split("/")[-1].split(".")[0]
+        outFile.addBookmark(pdfName,nPageBefore , parent=None)
     print("Saving")
     with open(outFilePath,'wb') as outStream: outFile.write(outStream) 
 
 #workFile("./in/1.pdf","./out/1.pdf")
+workFolder("./in","./out/")
 workFolderAndMerge("./in","./out/1.pdf")
