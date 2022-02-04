@@ -13,16 +13,21 @@ def inRange(x:float,l:float,r:float) -> bool:
 
 class Border:
     def __init__(self, f:Callable[[int],NDArray]) -> None:
+        '''Current line'''
         self.cur=0
+        '''A function to read the i-th line'''
         self.scan=f
     
+    '''Advance the border line until the average color is in [l,r)'''
     def scanUntil(self,l,r) -> None:
         while(inRange(np.average(self.scan(self.cur)),l,r)): 
             self.cur+=1
     
+    '''Advance the border line, until a line with no content is met, and remains in this line'''
     def scanUntilEmpty(self) -> None:
         self.scanUntil(0,255-tol)
     
+    '''Advance the border line, until a line with full content is met, and remains in this line'''
     def scanUntilContent(self) -> None:
         self.scanUntil(255-tol,255)
 
@@ -36,7 +41,14 @@ class CropPicture:
         self.BottomBorder=Border(lambda i:image[height-1-i,:])
         self.LeftBorder=Border(lambda i:image[:,i])
         self.RightBorder=Border(lambda i:image[:,width-1-i])
+        '''Clean the white margin'''
+        self.TopBorder.scanUntilContent()
+        self.BottomBorder.scanUntilContent()
+        self.LeftBorder.scanUntilContent()
+        self.RightBorder.scanUntilContent()
 
+
+    '''Set the cropbox of PyPDF2 according to the four border line'''
     def setCropBox(self,box):
         height=int(self.image.shape[0])
         width=int(self.image.shape[1])
@@ -54,10 +66,6 @@ class CropPicture:
 '''Strategy for cropping'''
 def process(i:int, image: NDArray, page) -> list :
     pic=CropPicture(image)
-    pic.TopBorder.scanUntilContent()
-    pic.BottomBorder.scanUntilContent()
-    pic.LeftBorder.scanUntilContent()
-    pic.RightBorder.scanUntilContent()
     if i==0:
         pic.BottomBorder.scanUntilEmpty()
         pic.BottomBorder.scanUntilContent()
@@ -67,6 +75,7 @@ def process(i:int, image: NDArray, page) -> list :
     pic.setCropBox(page.cropBox)
     return [page]
 
+'''RuleCrop the file, and save to PdfFileWriter'''
 def work(inFilePath:str, outFile:PdfFileWriter):
     images = convert_from_path(inFilePath,grayscale=True)
     inFile = PdfFileReader(open(inFilePath,"rb"))
@@ -74,12 +83,17 @@ def work(inFilePath:str, outFile:PdfFileWriter):
         for p in process(i,np.array(images[i]),inFile.getPage(i)):
             outFile.addPage(p)
 
-
+'''RuleCrop the file and save'''
 def workFile(inFilePath:str, outFilePath:str):
     outFile= PdfFileWriter()
     work(inFilePath,outFile)
     with open(outFilePath,'wb') as outStream: outFile.write(outStream) 
 
+'''For all pdfs in the folder, in the order of the integer they contain,
+- RuleCrop
+- Merge into one pdf
+- Add a bookmark
+'''
 def workFolderAndMerge(inFolderPath:str, outFilePath:str):
     outFile= PdfFileWriter()
     pdfList=sorted(
