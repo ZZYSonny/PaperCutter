@@ -98,9 +98,24 @@ def work(
             newp.cropBox=box.toCropbox()
             outFile.addPage(newp)
 
+def copyBookmarks(outlines, inFile: PdfFileReader, outFile: PdfFileWriter, parent=None):
+    '''Recursively add PyPDF2 bookmark to outFile'''
+    last=None
+    for b in outlines:
+        if '/Title' in b:
+            last=outFile.addBookmark(
+                title=b.title, 
+                pagenum=inFile.getDestinationPageNumber(b),
+                parent=parent
+            )
+        else:
+            copyBookmarks(b, inFile, outFile, last)
+
 def workFile(inFilePath:str, outFilePath:str, process):
-    '''- Crop the file
+    '''- Read `inFilePath`
+       - Crop each page according to `process`
        - Copy bookmarks
+       - Save to `outFilePath`
     '''
     #Load input PDF
     inFile = PdfFileReader(open(inFilePath,"rb"))
@@ -109,23 +124,26 @@ def workFile(inFilePath:str, outFilePath:str, process):
     #Crop for each page
     images = convert_from_path(inFilePath, grayscale=True)
     work(images, inFile,outFile, process)
-    #outFile.addBookmarkDestination(inFile.getOutlines()[0])
+    
+    copyBookmarks(inFile.getOutlines(), inFile, outFile)
+
     #Save file to path
     with open(outFilePath,'wb') as outStream: 
         outFile.write(outStream) 
 
 def workFolder(inFolderPath:str, outFolderPath:str, process):
-    '''RuleCrop the file in every folder'''
+    '''- For every file in `inFolderPath`
+       - `workFile` and save in a pdf of same name in `outFolderPath`    
+    '''
     for inFileName in os.listdir(inFolderPath):
         inFilePath=inFolderPath+"/"+inFileName
         outFilePath=outFolderPath+"/"+inFileName
         workFile(inFilePath, outFilePath, process)
 
 def workFolderAndMerge(inFolderPath:str, outFilePath:str, process):
-    '''For all pdfs in the folder, in the order of the integer they contain,
-    - RuleCrop
-    - Merge into one pdf
-    - Add a bookmark
+    '''- For every file in `inFolderPath`, in a natural ordering
+       - Crop each page according to `process`
+       - Add a bookmark as entry for every file
     '''
     outFile= PdfFileWriter()
     for fileName in naturalSort(os.listdir(inFolderPath)):
@@ -165,5 +183,5 @@ def processArxiv(pic: CropPicture) -> list :
     return [pic]
 
 #workFile("./in/1.pdf","./out/1.pdf")
-workFolder("./in","./out", processQNote)
+workFolder("./in","./out", processAKNote)
 #workFolderAndMerge("./in","./out/1.pdf")
