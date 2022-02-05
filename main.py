@@ -98,18 +98,18 @@ def work(
             newp.cropBox=box.toCropbox()
             outFile.addPage(newp)
 
-def copyBookmarks(outlines, inFile: PdfFileReader, outFile: PdfFileWriter, parent=None):
+def copyBookmarks(outlines, inFile: PdfFileReader, outFile: PdfFileWriter, parent=None, offset=0):
     '''Recursively add PyPDF2 bookmark to outFile'''
     last=None
     for b in outlines:
         if '/Title' in b:
             last=outFile.addBookmark(
                 title=b.title, 
-                pagenum=inFile.getDestinationPageNumber(b),
+                pagenum=inFile.getDestinationPageNumber(b)+offset,
                 parent=parent
             )
         else:
-            copyBookmarks(b, inFile, outFile, last)
+            copyBookmarks(b, inFile, outFile, last, offset)
 
 def workFile(inFilePath:str, outFilePath:str, process):
     '''- Read `inFilePath`
@@ -149,9 +149,16 @@ def workFolderAndMerge(inFolderPath:str, outFilePath:str, process):
     for fileName in naturalSort(os.listdir(inFolderPath)):
         print("Start: "+fileName)
         nPageBefore=outFile.getNumPages()
-        work(inFolderPath+"/"+fileName,outFile, process)
-        pdfName=fileName.split("/")[-1].split(".")[0]
-        outFile.addBookmark(pdfName,nPageBefore , parent=None)
+        #Read file
+        inFilePath=inFolderPath+"/"+fileName
+        inFile = PdfFileReader(open(inFilePath,"rb"))
+        #Crop
+        images = convert_from_path(inFilePath, grayscale=True)
+        work(images, inFile, outFile, process)
+        #Add bookmark for file, and add sub bookmarks
+        entryName=fileName.split("/")[-1].split(".")[0]
+        entryForFile=outFile.addBookmark(entryName,nPageBefore)
+        copyBookmarks(inFile.getOutlines(), inFile, outFile, entryForFile, nPageBefore)
     print("Saving")
     with open(outFilePath,'wb') as outStream: outFile.write(outStream) 
 
@@ -183,5 +190,5 @@ def processArxiv(pic: CropPicture) -> list :
     return [pic]
 
 #workFile("./in/1.pdf","./out/1.pdf")
-workFolder("./in","./out", processAKNote)
-#workFolderAndMerge("./in","./out/1.pdf")
+#workFolder("./in","./out", processAKNote)
+workFolderAndMerge("./in","./out/1.pdf", processQNote)
