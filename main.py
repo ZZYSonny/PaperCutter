@@ -98,7 +98,7 @@ def cropFile(inFilePath:str, outFilePath: str, cropFunction):
     #Load input PDF
     inPDF = fitz.open(inFilePath)
     workFile(inPDF, cropFunction)
-    inPDF.save(outFilePath)
+    inPDF.ez_save(outFilePath)
 
 def cropFolder(inFolderPath:str, outFolderPath:str, cropFunction):
     '''- For every file in `inFolderPath`
@@ -132,7 +132,7 @@ def mergeFolder(inFolderPath:str, outFilePath:str):
             item[3]['page']+=nPageBefore
             outToC.append(item)
     outPDF.set_toc(outToC)
-    outPDF.save(outFilePath)
+    outPDF.ez_save(outFilePath)
 
 def cropThenMerge(inFolderPath:str, outFilePath:str, cropFunction, tempDir:str):
     if os.path.exists(tempDir): shutil.rmtree(tempDir)
@@ -156,5 +156,5 @@ def cropAKNote(pic: CropPicture):
         pic.TopBorder.scanUntilEmpty()
         pic.TopBorder.scanUntilContent()
 
-#workFile('./in/chapter.pdf', './out/chapter.pdf', cropQNote)
-cropThenMerge('./in','./out/merged.pdf', cropAKNote, './temp')
+cropFolder('./in', './out', cropAKNote)
+#cropThenMerge('./in','./out/merged.pdf', cropAKNote, './temp')
