@@ -123,7 +123,8 @@ def mergeFolder(inFolderPath:str, outFilePath:str):
         outPDF.insert_pdf(inPDF)
         inToC = inPDF.get_toc(simple = False)
         #Add an entry for the file
-        outToC.append([1, fileName, nPageBefore + 1])
+        entryName = os.path.splitext(fileName)[0]
+        outToC.append([1, entryName, nPageBefore + 1])
         #Add bookmark in inPDF under the bookmark for file
         for item in inToC:
             item[0]+=1
