@@ -72,10 +72,8 @@ class CropPicture:
         ]))
 
 def workFile(inPDF:fitz.Document, cropFunction):
-    '''- Read `inFilePath`
-       - Crop each page according to `process`
-       - Copy bookmarks
-       - Save to `outFilePath`
+    '''- crop white margin for each page
+       - then apply cropFunction to further reduce margin
     '''
     bookmarkL1=[
         page-1 for lvl,title,page in inPDF.get_toc()
@@ -87,13 +85,14 @@ def workFile(inPDF:fitz.Document, cropFunction):
             'isBookmark': i in bookmarkL1
         }
         crop=CropPicture(page,attr)
-        if cropFunction is not None: cropFunction(crop)
+        # TODO: split a page into two pages
+        if cropFunction is not None: 
+            cropFunction(crop)
         crop.setCropbox()
 
 def cropFile(inFilePath:str, outFilePath: str, cropFunction):
     '''- Read `inFilePath`
        - Crop each page according to `process`
-       - Copy bookmarks
        - Save to `outFilePath`
     '''
     #Load input PDF
@@ -111,6 +110,11 @@ def cropFolder(inFolderPath:str, outFolderPath:str, cropFunction):
         cropFile(inFilePath, outFilePath, cropFunction)
 
 def mergeFolder(inFolderPath:str, outFilePath:str):
+    '''- Merge all files under inFolderPath
+       - And save to outFilePath
+       - A bookmark is created for each file
+        - bookmark of merged PDF is added under this bookmark
+    '''
     outPDF=fitz.Document()
     outToC = []
     for fileName in naturalSort(os.listdir(inFolderPath)):
