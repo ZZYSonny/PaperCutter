@@ -1,11 +1,9 @@
-name: pypdfcrop
-channels:
-  - conda-forge
-  - defaults
-  - tc06580
+name: papercutter
 dependencies:
   - python=3.10
   - numpy
-  - pypdf2
-  - pdf2image 
-  - pymupdf 
+  - pillow
+  - bs4
+  - pip
+  - pip:
+    - pymupdf

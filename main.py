@@ -1,13 +1,21 @@
+import json
+from typing import *
+from urllib.request import urlopen, urlretrieve
+from numpy.typing import *
 import shutil
-from typing import Callable
-from numpy.typing import NDArray
+from bs4 import BeautifulSoup
+import urllib
 import fitz
 from PIL import Image
-import numpy as np
 import numpy as np
 import os
 import re
 tol=0.2
+
+DEFAULT_INPUT_FOLDER='./in'
+DEFAULT_OUTPUT_FOLDER='./out'
+DEFAULT_TEMP_MERGE_FOLDER='./merge'
+DEFAULT_TEMP_ARXIV_FOLDER='./arxiv'
 
 def inRange(x:float,l:float,r:float) -> bool:
     return l<=x and x<=r
@@ -46,7 +54,7 @@ class CropPicture:
         attr: dict[str,bool]
     ) -> None:
         self.page=page
-        pix = page.getPixmap(colorspace='GRAY', alpha=False)
+        pix = page.get_pixmap(colorspace='GRAY', alpha=False)
         img = Image.frombytes('L', [pix.width, pix.height], pix.samples)
         self.image=np.array(img)
         self.attr=attr
@@ -71,7 +79,7 @@ class CropPicture:
             (1-(self.BottomBorder.cur/height))*pdfHeight
         ]))
 
-def workFile(inPDF:fitz.Document, cropFunction):
+def workFile(cropFunction, inPDF:fitz.Document):
     '''- crop white margin for each page
        - then apply cropFunction to further reduce margin
     '''
@@ -89,25 +97,6 @@ def workFile(inPDF:fitz.Document, cropFunction):
         if cropFunction is not None: 
             cropFunction(crop)
         crop.setCropbox()
-
-def cropFile(inFilePath:str, outFilePath: str, cropFunction):
-    '''- Read `inFilePath`
-       - Crop each page according to `process`
-       - Save to `outFilePath`
-    '''
-    #Load input PDF
-    inPDF = fitz.open(inFilePath)
-    workFile(inPDF, cropFunction)
-    inPDF.ez_save(outFilePath)
-
-def cropFolder(inFolderPath:str, outFolderPath:str, cropFunction):
-    '''- For every file in `inFolderPath`
-       - `workFile` and save in a pdf of same name in `outFolderPath`    
-    '''
-    for inFileName in os.listdir(inFolderPath):
-        inFilePath=inFolderPath+"/"+inFileName
-        outFilePath=outFolderPath+"/"+inFileName
-        cropFile(inFilePath, outFilePath, cropFunction)
 
 def mergeFolder(inFolderPath:str, outFilePath:str):
     '''- Merge all files under inFolderPath
@@ -134,11 +123,54 @@ def mergeFolder(inFolderPath:str, outFilePath:str):
     outPDF.set_toc(outToC)
     outPDF.ez_save(outFilePath)
 
-def cropThenMerge(inFolderPath:str, outFilePath:str, cropFunction, tempDir:str):
+def cropFile(cropFunction, inFilePath:str, outFilePath: str):
+    '''- Read `inFilePath`
+       - Crop each page according to `process`
+       - Save to `outFilePath`
+    '''
+    #Load input PDF
+    inPDF = fitz.open(inFilePath)
+    workFile(cropFunction, inPDF)
+    inPDF.ez_save(outFilePath)
+
+def cropFolder(cropFunction, inFolderPath:str=DEFAULT_INPUT_FOLDER, outFolderPath:str=DEFAULT_OUTPUT_FOLDER):
+    '''- For every file in `inFolderPath`
+       - `workFile` and save in a pdf of same name in `outFolderPath`    
+    '''
+    for inFileName in os.listdir(inFolderPath):
+        inFilePath=inFolderPath+"/"+inFileName
+        outFilePath=outFolderPath+"/"+inFileName
+        cropFile(cropFunction, inFilePath, outFilePath)
+
+def cropThenMerge(cropFunction, inFolderPath:str=DEFAULT_INPUT_FOLDER, outFilePath:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT_TEMP_MERGE_FOLDER):
     if os.path.exists(tempDir): shutil.rmtree(tempDir)
     os.mkdir(tempDir)
-    cropFolder(inFolderPath, tempDir, cropFunction)
+    cropFolder(cropFunction, inFolderPath, tempDir)
     mergeFolder(tempDir, outFilePath)
+
+def cropArxiv(cropFunction, url:str, outFileDir:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT_TEMP_ARXIV_FOLDER):    
+    titleCachePath=tempDir+"/title_cache"
+    if not os.path.exists(titleCachePath):
+        json.dump({}, open(titleCachePath, 'w'))
+    titleCache=json.load(open(titleCachePath))
+    
+    paperTitle=""
+    if url in titleCache:
+        paperTitle=titleCache[url]
+    else:
+        titleURL='https://arxiv.org/abs/'+url
+        html = BeautifulSoup(urlopen(titleURL).read())
+        paperTitle = html.title.string.split('] ')[1]
+        titleCache[url]=paperTitle
+        json.dump(titleCache, open(titleCachePath, 'w'))
+
+    pdfPath=tempDir+"/"+url+'.pdf'
+    if not os.path.exists(pdfPath):
+        pdfURL='https://arxiv.org/pdf/'+url+'.pdf'
+        urlretrieve(pdfURL,pdfPath)
+    
+    outFilePath=outFileDir+'/'+paperTitle+'.pdf'
+    cropFile(cropFunction, pdfPath, outFilePath)
 
 def cropQNote(pic: CropPicture):
     if pic.attr['isFirst']:
@@ -156,5 +188,14 @@ def cropAKNote(pic: CropPicture):
         pic.TopBorder.scanUntilEmpty()
         pic.TopBorder.scanUntilContent()
 
-cropFolder('./in', './out', cropAKNote)
+def cropArxivPaper(pic: CropPicture):
+    if pic.attr['isFirst']:
+        pic.LeftBorder.scanUntilEmpty()
+        pic.LeftBorder.scanUntilContent()
+    pic.BottomBorder.scanUntilEmpty()
+    pic.BottomBorder.scanUntilContent()
+
+#cropFolder('./in', './out', cropAKNote)
 #cropThenMerge('./in','./out/merged.pdf', cropAKNote, './temp')
+cropArxiv(cropArxivPaper, '2011.03854')
+cropArxiv(cropArxivPaper, '2006.10637')
