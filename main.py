@@ -10,7 +10,7 @@ from PIL import Image
 import numpy as np
 import os
 import re
-tol=0.2
+tol=0.1
 
 DEFAULT_INPUT_FOLDER='./in'
 DEFAULT_OUTPUT_FOLDER='./out'
@@ -123,6 +123,31 @@ def mergeFolder(inFolderPath:str, outFilePath:str):
     outPDF.set_toc(outToC)
     outPDF.ez_save(outFilePath)
 
+def mergeFiles(inFolderPath: str, inFiles:list[str], outFilePath:str):
+    '''- Merge all files under inFolderPath
+       - And save to outFilePath
+       - A bookmark is created for each file
+        - bookmark of merged PDF is added under this bookmark
+    '''
+    outPDF=fitz.Document()
+    outToC = []
+    for fileName in inFiles:
+        nPageBefore = outPDF.page_count
+        inPDF = fitz.open(inFolderPath+"/"+fileName)
+        outPDF.insert_pdf(inPDF)
+        inToC = inPDF.get_toc(simple = False)
+        #Add an entry for the file
+        entryName = os.path.splitext(fileName)[0]
+        outToC.append([1, entryName, nPageBefore + 1])
+        #Add bookmark in inPDF under the bookmark for file
+        for item in inToC:
+            item[0]+=1
+            item[2]+=nPageBefore
+            item[3]['page']+=nPageBefore
+            outToC.append(item)
+    outPDF.set_toc(outToC)
+    outPDF.ez_save(outFilePath)
+
 def cropFile(cropFunction, inFilePath:str, outFilePath: str):
     '''- Read `inFilePath`
        - Crop each page according to `process`
@@ -138,9 +163,10 @@ def cropFolder(cropFunction, inFolderPath:str=DEFAULT_INPUT_FOLDER, outFolderPat
        - `workFile` and save in a pdf of same name in `outFolderPath`    
     '''
     for inFileName in os.listdir(inFolderPath):
-        inFilePath=inFolderPath+"/"+inFileName
-        outFilePath=outFolderPath+"/"+inFileName
-        cropFile(cropFunction, inFilePath, outFilePath)
+        if(inFileName.endswith("pdf")):
+            inFilePath=inFolderPath+"/"+inFileName
+            outFilePath=outFolderPath+"/"+inFileName
+            cropFile(cropFunction, inFilePath, outFilePath)
 
 def cropThenMerge(cropFunction, inFolderPath:str=DEFAULT_INPUT_FOLDER, outFilePath:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT_TEMP_MERGE_FOLDER):
     if os.path.exists(tempDir): shutil.rmtree(tempDir)
@@ -194,8 +220,33 @@ def cropArxivPaper(pic: CropPicture):
         pic.LeftBorder.scanUntilContent()
     pic.BottomBorder.scanUntilEmpty()
     pic.BottomBorder.scanUntilContent()
+    pic.TopBorder.scanUntilEmpty()
+    pic.TopBorder.scanUntilContent()
+
+def cropNoMore(pic: CropPicture):
+    pass
+
+def cropBottomNumber(pic: CropPicture):
+    pic.BottomBorder.scanUntilEmpty()
+    pic.BottomBorder.scanUntilContent()
+    if pic.BottomBorder.cur<90:
+        pic.BottomBorder.scanUntilEmpty()
+        pic.BottomBorder.scanUntilContent()
+
+
+
+def downloadArray(files: list[Tuple[str,str]], outFolderPath:str):
+    for [url,filename] in files:
+        urlretrieve(url, outFolderPath + '/' + filename)
+
+def recreateDir(tempDir:str):
+    if os.path.exists(tempDir): shutil.rmtree(tempDir)
+    os.mkdir(tempDir)
 
 #cropFolder('./in', './out', cropAKNote)
 #cropThenMerge('./in','./out/merged.pdf', cropAKNote, './temp')
-cropArxiv(cropArxivPaper, '2011.03854')
-cropArxiv(cropArxivPaper, '2006.10637')
+#cropArxiv(cropArxivPaper, '2011.03854')
+#cropArxiv(cropArxivPaper, '1905.09550')
+
+#cropThenMerge(cropNoMore, './in', './out/merge.pdf')
+
