@@ -1,10 +1,8 @@
-from tempfile import tempdir
 import fitz
 import re
 import os
 import shutil
-import json
-from bs4 import BeautifulSoup
+from xml.dom import minidom
 from urllib.request import urlopen, urlretrieve
 
 DEFAULT_INPUT_FOLDER='./in'
@@ -110,12 +108,12 @@ def crop_arxiv(id:str, outFileDir:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT
             in_path = os.path.join(tempDir, f)
     
     if in_path == "":
-        url_title=f'https://arxiv.org/abs/{id}'
-        url_pdf=f'https://arxiv.org/pdf/{id}.pdf'
-        bs4 = BeautifulSoup(urlopen(url_title).read(), features="html.parser")
-        title = bs4.title.string
-        in_path = os.path.join(tempDir, f"{title}.pdf")
-        urlretrieve(url_pdf, in_path)
+        meta_str = urlopen(f'https://export.arxiv.org/api/query?id_list={id}&max_results=1').read().decode('utf-8')
+        meta_xml = minidom.parseString(meta_str).getElementsByTagName("feed")[0].getElementsByTagName("entry")[0]
+        title = meta_xml.getElementsByTagName("title")[0].childNodes[0].data
+        f = f"[{id}] {title}.pdf"
+        in_path = os.path.join(tempDir, f)
+        urlretrieve(f'https://arxiv.org/pdf/{id}.pdf', in_path)
     
     out_path=os.path.join(outFileDir, os.path.split(in_path)[1])
     crop_doc(in_path, out_path)

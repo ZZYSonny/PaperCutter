@@ -1,7 +1,6 @@
 name: papercutter
 dependencies:
   - python=3.10
-  - bs4
   - pip
   - pip:
     - pymupdf
