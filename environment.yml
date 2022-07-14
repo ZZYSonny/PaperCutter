@@ -1,8 +1,6 @@
 name: papercutter
 dependencies:
   - python=3.10
-  - numpy
-  - pillow
   - bs4
   - pip
   - pip:
