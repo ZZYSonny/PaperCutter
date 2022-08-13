@@ -21,7 +21,14 @@ def sort_files(xs:list[str]) -> list[str]:
         key=lambda s:int(re.sub('\D', '', s))
     )
 
-def union_box(box:list[str], bbox:list[str]):
+def include_box(cropbox:list[int], bbox: list[int]):
+    return (cropbox[0] <= bbox[0]
+        and cropbox[1] <= bbox[1]
+        and cropbox[2] >= bbox[2]
+        and cropbox[3] >= bbox[3]
+    )
+
+def union_box(box:list[int], bbox:list[int]):
     '''Union two boxes in pdf'''
     box[0] = min(box[0], bbox[0])
     box[1] = min(box[1], bbox[1])
@@ -38,16 +45,18 @@ def crop_page(page:fitz.Page):
                 if not filter_text(span["text"]):
                     union_box(box, span["bbox"])
 
-    pics=page.get_image_info()
-    for pic in pics:
-        union_box(box, pic['bbox'])
-    
+    for [kind, rect] in page.get_bboxlog():
+        if kind in ["fill-path", "stroke-path", "fill-image", "fill-shade"]:
+            if include_box(page.cropbox, rect) and abs(rect[3]-rect[1]) > 32:
+                union_box(box, rect)
     page.set_cropbox(box)
 
 
 def crop_doc(inPath: str, outPath: str):
     '''Crop a document, and save to'''
     in_pdf = fitz.open(inPath)
+    #for i in range(5,7):
+    #    crop_page(in_pdf[i])
     for page in in_pdf:
         crop_page(page)
     in_pdf.ez_save(outPath)
