@@ -10,9 +10,20 @@ DEFAULT_OUTPUT_FOLDER='./out'
 DEFAULT_TEMP_MERGE_FOLDER='./temp/merge'
 DEFAULT_TEMP_ARXIV_FOLDER='./temp/arxiv'
 
+filter_functions = []
+
+def common_filter_function(title:str):
+    global filter_functions
+    filter_functions = [
+        lambda s: s.startswith("arXiv:"),
+        lambda s: s.startswith("Published as a conference paper at"),
+        lambda s: s.isdigit(),
+        lambda s: s==title
+    ]
+
 def filter_text(text:str) -> bool:
     '''Check if a text span should be kept'''
-    return text.startswith("arXiv:")
+    return any(f(text) for f in filter_functions)
 
 def sort_files(xs:list[str]) -> list[str]:
     '''Sort filename in a more pleasant order'''
@@ -115,6 +126,7 @@ def crop_arxiv(id:str, outFileDir:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT
     for f in os.listdir(tempDir):
         if f.startswith(f"[{id}]"):
             in_path = os.path.join(tempDir, f)
+            title = f.split(".pdf")[0].split("] ")[1]
     
     if in_path == "":
         meta_str = urlopen(f'https://export.arxiv.org/api/query?id_list={id}&max_results=1').read().decode('utf-8')
@@ -124,5 +136,6 @@ def crop_arxiv(id:str, outFileDir:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT
         in_path = os.path.join(tempDir, f)
         urlretrieve(f'https://arxiv.org/pdf/{id}.pdf', in_path)
     
+    common_filter_function(title)
     out_path=os.path.join(outFileDir, os.path.split(in_path)[1])
     crop_doc(in_path, out_path)
