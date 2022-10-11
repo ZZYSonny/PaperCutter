@@ -10,26 +10,28 @@ DEFAULT_OUTPUT_FOLDER='./out'
 DEFAULT_TEMP_MERGE_FOLDER='./temp/merge'
 DEFAULT_TEMP_ARXIV_FOLDER='./temp/arxiv'
 
-filter_functions = []
+filter_functions = [
+    lambda s: s.startswith("arXiv:"),
+    lambda s: s.startswith("Published as a conference paper at"),
+    lambda s: s.lstrip().rstrip().isdigit()
+]
+custom_filter_functions = []
 
 def common_filter_function(title:str):
     global filter_functions
-    filter_functions = [
-        lambda s: s.startswith("arXiv:"),
-        lambda s: s.startswith("Published as a conference paper at"),
-        lambda s: s.isdigit(),
+    filter_functions.append(
         lambda s: s==title
-    ]
+    )
 
 def filter_text(text:str) -> bool:
     '''Check if a text span should be kept'''
-    return any(f(text) for f in filter_functions)
+    return any(f(text) for f in filter_functions + custom_filter_functions)
 
-def sort_files(xs:list[str]) -> list[str]:
+def sort_files(xs:list[str], inFolderPath:str) -> list[str]:
     '''Sort filename in a more pleasant order'''
     return sorted(
         xs,
-        key=lambda s:int(re.sub('\D', '', s))
+        key=lambda s:os.path.getctime(os.path.join(inFolderPath, s))
     )
 
 def include_box(cropbox:list[int], bbox: list[int]):
@@ -60,13 +62,15 @@ def crop_page(page:fitz.Page):
         if kind in ["fill-path", "stroke-path", "fill-image", "fill-shade"]:
             if include_box(page.cropbox, rect) and abs(rect[3]-rect[1]) > 32:
                 union_box(box, rect)
-    page.set_cropbox(box)
+    box[1] = max(0, box[1])
+    if not box == [float("inf"), float("inf"), float("-inf"), float("-inf")]:
+        page.set_cropbox(box)
 
 
 def crop_doc(inPath: str, outPath: str):
     '''Crop a document, and save to'''
     in_pdf = fitz.open(inPath)
-    #for i in range(5,7):
+    #for i in [61]:
     #    crop_page(in_pdf[i])
     for page in in_pdf:
         crop_page(page)
@@ -84,7 +88,9 @@ def merge_files(inFiles:list[str], outFilePath:str):
         out_pdf.insert_pdf(inPDF)
         inToC = inPDF.get_toc(simple = False)
         #Add an entry for the file
-        name = os.path.splitext(fileName)[0]
+        name = inPDF.metadata["title"]
+        if name is None or name == "":
+            name = os.path.splitext(os.path.split(fileName)[-1])[0]
         out_toc.append([1, name, nPageBefore + 1])
         #Add bookmark in inPDF under the bookmark for file
         for item in inToC:
@@ -108,7 +114,7 @@ def merge_folder(inFolderPath:str, outFilePath:str):
     '''Merge all files in inFolderPath and save to outFilePath
     '''
     merge_files(
-        [os.path.join(inFolderPath, f) for f in sort_files(os.listdir(inFolderPath))],
+        [os.path.join(inFolderPath, f) for f in sort_files(os.listdir(inFolderPath), inFolderPath)],
         outFilePath
     )
 
