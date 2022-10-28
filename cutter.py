@@ -9,6 +9,7 @@ DEFAULT_INPUT_FOLDER='./in'
 DEFAULT_OUTPUT_FOLDER='./out'
 DEFAULT_TEMP_MERGE_FOLDER='./temp/merge'
 DEFAULT_TEMP_ARXIV_FOLDER='./temp/arxiv'
+DEBUG_PRINT_PAGE = []
 
 filter_functions = [
     lambda s: s.startswith("arXiv:"),
@@ -48,7 +49,7 @@ def union_box(box:list[int], bbox:list[int]):
     box[2] = max(box[2], bbox[2])
     box[3] = max(box[3], bbox[3])
 
-def crop_page(page:fitz.Page):
+def crop_page(page:fitz.Page, i:int):
     '''Crop a page'''
     box = [float("inf"), float("inf"), float("-inf"), float("-inf")]
     texts=page.get_textpage().extractDICT()
@@ -56,6 +57,7 @@ def crop_page(page:fitz.Page):
         for line in block["lines"]:
             for span in line["spans"]:
                 if not filter_text(span["text"]):
+                    if i in DEBUG_PRINT_PAGE: print(span["text"])
                     union_box(box, span["bbox"])
 
     for [kind, rect] in page.get_bboxlog():
@@ -72,8 +74,8 @@ def crop_doc(inPath: str, outPath: str):
     in_pdf = fitz.open(inPath)
     #for i in [61]:
     #    crop_page(in_pdf[i])
-    for page in in_pdf:
-        crop_page(page)
+    for i,page in enumerate(in_pdf):
+        crop_page(page,i)
     in_pdf.ez_save(outPath)
 
 def merge_files(inFiles:list[str], outFilePath:str):
