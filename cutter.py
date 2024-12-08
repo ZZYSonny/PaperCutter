@@ -69,7 +69,10 @@ def crop_page(page:fitz.Page, i:int):
                 union_box(box, rect)
     box[1] = max(0, box[1])
     if not box == [float("inf"), float("inf"), float("-inf"), float("-inf")]:
-        page.set_cropbox(box)
+        try:
+            page.set_cropbox(box)
+        except:
+            print("Error in page", i)
 
 
 def crop_doc(inPath: str, outPath: str):
