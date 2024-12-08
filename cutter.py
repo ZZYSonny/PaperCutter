@@ -3,7 +3,7 @@ import re
 import os
 import shutil
 from xml.dom import minidom
-from urllib.request import urlopen, urlretrieve
+import requests
 
 DEFAULT_INPUT_FOLDER='./in'
 DEFAULT_OUTPUT_FOLDER='./out'
@@ -14,7 +14,10 @@ DEBUG_PRINT_PAGE = []
 filter_functions = [
     lambda s: s.startswith("arXiv:"),
     lambda s: s.startswith("Published as a conference paper at"),
-    lambda s: s.lstrip().rstrip().isdigit()
+    lambda s: s.lstrip().rstrip().isdigit(),
+    lambda s: re.match("[0-9]\\.[0-9]\\.", s) is not None,
+    lambda s: re.match("CHAPTER [0-9]\\.", s) is not None,
+    lambda s: s == "PRIME AI paper"
 ]
 custom_filter_functions = []
 
@@ -131,18 +134,21 @@ def crop_then_merge(inFolderPath:str=DEFAULT_INPUT_FOLDER, outFilePath:str=DEFAU
 def crop_arxiv(id:str, outFileDir:str=DEFAULT_OUTPUT_FOLDER, tempDir:str=DEFAULT_TEMP_ARXIV_FOLDER):    
     '''Download (with cache) and crop a paper on Arxiv '''
     in_path = ""
-    for f in os.listdir(tempDir):
-        if f.startswith(f"[{id}]"):
-            in_path = os.path.join(tempDir, f)
-            title = f.split(".pdf")[0].split("] ")[1]
+    for fname in os.listdir(tempDir):
+        if fname.startswith(f"[{id}]"):
+            in_path = os.path.join(tempDir, fname)
+            title = fname.split(".pdf")[0].split("] ")[1]
     
+    url_info = f"https://export.arxiv.org/api/query?id_list={id}&max_results=1"
+    url_file = f"https://arxiv.org/pdf/{id}.pdf"
     if in_path == "":
-        meta_str = urlopen(f'https://export.arxiv.org/api/query?id_list={id}&max_results=1').read().decode('utf-8')
+        meta_str = requests.get(url_info).text
         meta_xml = minidom.parseString(meta_str).getElementsByTagName("feed")[0].getElementsByTagName("entry")[0]
         title = meta_xml.getElementsByTagName("title")[0].childNodes[0].data
-        f = f"[{id}] {title}.pdf"
-        in_path = os.path.join(tempDir, f)
-        urlretrieve(f'https://arxiv.org/pdf/{id}.pdf', in_path)
+        in_path = os.path.join(tempDir, f"[{id}] {title}.pdf")
+        with open(in_path, "wb") as f:
+            for chunk in requests.get(url_file).iter_content(16*1024):
+                f.write(chunk)
     
     common_filter_function(title)
     out_path=os.path.join(outFileDir, os.path.split(in_path)[1])
